@@ -104,20 +104,26 @@ class rs2_wrapper:
 
 
     def get_pipeline(self):
-        serial_no = rospy.get_param('~serial_no', '')
         pipeline = rs.pipeline()
         cfg = rs.config()
-        cfg.enable_device(serial_no)
-        #  pipeline.get_active_profile().get_device().get_info(rs.camera_info.serial_number)
-        if rospy.get_param('~enable_color', False):
-            cfg.enable_stream(rs.stream.color, 0, rospy.get_param('~color_width', 0), rospy.get_param('~color_height', 0), rs.format.any, rospy.get_param('~color_fps', '0'))
-        if rospy.get_param('~enable_depth', False):
-            cfg.enable_stream(rs.stream.depth, 0, rospy.get_param('~depth_width', 0), rospy.get_param('~depth_height', 0), rs.format.any, rospy.get_param('~depth_fps', '0'))
-        if rospy.get_param('~enable_infra1', False):
-            cfg.enable_stream(rs.stream.infrared, 1, rospy.get_param('~infra1_width', 0), rospy.get_param('~infra1_height', 0), rs.format.any, rospy.get_param('~infra1_fps', 0))
-        if rospy.get_param('~enable_infra2', False):
-            cfg.enable_stream(rs.stream.infrared, 2, rospy.get_param('~infra2_width', 0), rospy.get_param('~infra2_height', 0), rs.format.any, rospy.get_param('~infra2_fps', 0))
-        rospy.loginfo('Connecting to camera %s' % ('...' if serial_no == '' else ' with serial number %s' % serial_no))
+        if rospy.get_param('~rosbag_filename', ''):
+            rosbag_filename = rospy.get_param('~rosbag_filename', '')
+            rospy.loginfo('Running from file: %s' % rosbag_filename)
+            cfg.enable_device_from_file(rosbag_filename, False);
+            cfg.enable_all_streams();
+        else:
+            serial_no = rospy.get_param('~serial_no', '')
+            cfg.enable_device(serial_no)
+            #  pipeline.get_active_profile().get_device().get_info(rs.camera_info.serial_number)
+            if rospy.get_param('~enable_color', False):
+                cfg.enable_stream(rs.stream.color, 0, rospy.get_param('~color_width', 0), rospy.get_param('~color_height', 0), rs.format.any, rospy.get_param('~color_fps', '0'))
+            if rospy.get_param('~enable_depth', False):
+                cfg.enable_stream(rs.stream.depth, 0, rospy.get_param('~depth_width', 0), rospy.get_param('~depth_height', 0), rs.format.any, rospy.get_param('~depth_fps', '0'))
+            if rospy.get_param('~enable_infra1', False):
+                cfg.enable_stream(rs.stream.infrared, 1, rospy.get_param('~infra1_width', 0), rospy.get_param('~infra1_height', 0), rs.format.any, rospy.get_param('~infra1_fps', 0))
+            if rospy.get_param('~enable_infra2', False):
+                cfg.enable_stream(rs.stream.infrared, 2, rospy.get_param('~infra2_width', 0), rospy.get_param('~infra2_height', 0), rs.format.any, rospy.get_param('~infra2_fps', 0))
+            rospy.loginfo('Connecting to camera %s' % ('...' if serial_no == '' else ' with serial number %s' % serial_no))
         pipeline.start(cfg)
         rospy.loginfo('Done.')
         return pipeline
