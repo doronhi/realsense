@@ -7,10 +7,6 @@ import numpy as np
 import constants
 
 
-def dyn_rec_callback(config, level):
-    rospy.loginfo("Received reconf call: " + str(config))
-    return config
-
 def say(name):
     rospy.loginfo('Hello ' + name)
 
@@ -34,11 +30,77 @@ stream_to_format = {rs.stream.depth: rs.format.z16,
 class rs2_wrapper:
     def __init__(self):
         self.pipeline = self.get_pipeline()
+        self.publish_options()
         self.publishers = dict()
         self.bridge = CvBridge()
         self.seq = dict()   # Will contain sequential number for each topic key (stream, index, format)
         self.set_initial_params()
         self.camera_info = dict()
+
+    def create_callback(self, sensor):
+        def callback(config, level):
+            for param_name, value in config.items():
+                if param_name not in rs.option.__members__:
+                    continue
+                option = rs.option.__members__[param_name]
+                if sensor.get_option(option) != value:
+                    rospy.loginfo('update %s:%s to %s' % (sensor.get_info(rs.camera_info.name), param_name, value))
+                    sensor.set_option(option ,value)
+            return config
+        return callback
+
+    def publish_options(self):
+        self.ddynrec = dict()
+        for sensor in self.pipeline.get_active_profile().get_device().sensors:
+            self.publish_options_for_sensor(sensor)
+
+    def publish_options_for_sensor(self, sensor):
+        name = sensor.get_info(rs.camera_info.name)
+        self.ddynrec[name] = DDynamicReconfigure('_'.join(name.split()))
+        for option_m in rs.option.__members__.items():
+            option_str, option = option_m
+            if not sensor.supports(option) or sensor.is_option_read_only(option):
+                continue
+            if self.is_checkbox(sensor, option):
+                self.ddynrec[name].add_variable(option_str, sensor.get_option_description(option), bool(sensor.get_option(option)))
+            elif self.is_enum_option(sensor, option):
+                enum_method = self.get_enum_method(sensor, option)
+                self.ddynrec[name].add_variable(option_str, sensor.get_option_description(option),
+                                                int(sensor.get_option(option)),
+                                                int(sensor.get_option_range(option).min),
+                                                int(sensor.get_option_range(option).max),
+                                                edit_method=enum_method)
+            else:
+                self.ddynrec[name].add_variable(option_str, sensor.get_option_description(option), sensor.get_option(option), sensor.get_option_range(option).min, sensor.get_option_range(option).max)
+        self.ddynrec[name].start(self.create_callback(sensor))
+
+    def is_checkbox(self, sensor, option):
+        op_range = sensor.get_option_range(option)
+        return (op_range.min == 0 and op_range.max == 1 and op_range.step == 1)
+
+    def is_enum_option(self, sensor, option):
+        op_range = sensor.get_option_range(option)
+        if op_range.step != 1.0:
+            return False
+        op_range = sensor.get_option_range(option)
+        for val in range(int(op_range.min), int(op_range.max + 1), int(op_range.step)):
+            if sensor.get_option_value_description(option, val) is None:
+                return False
+        return True
+
+    def get_enum_method(self, sensor, option):
+        if not self.is_enum_option(sensor, option):
+            return ""
+        name = sensor.get_info(rs.camera_info.name)
+        op_range = sensor.get_option_range(option)
+        str_list = []
+        for val in range(int(op_range.min), int(op_range.max+1), int(op_range.step)):
+            val_str = sensor.get_option_value_description(option, val)
+            str_list.append(self.ddynrec[name].const(val_str, "int", int(val), val_str))
+
+        enum_method = self.ddynrec[name].enum(str_list, str(option).split('.')[1])
+        return enum_method
+
 
     def get_stereo_baseline(self):
         return self.pipeline.get_active_profile().get_device().first_depth_sensor().get_option(rs.option.stereo_baseline)
@@ -166,11 +228,11 @@ class rs2_wrapper:
             cam_info.header.seq = seq
             publisher.publish(cam_info)
 
-
     def run(self):
+        rospy.loginfo('Started listening for frames.')
         while not rospy.is_shutdown():
             frames = self.pipeline.wait_for_frames()
-            rospy.loginfo('Got frames:')
+            # rospy.loginfo('Got frames:')
             # print '\n'.join(['type: %s, index: %d, format %s' % (frame.get_profile().stream_type(), frame.get_profile().stream_index(), frame.get_profile().format) for frame in frames])
             crnt_time = rospy.Time.now()
             for frame in frames:
@@ -180,8 +242,6 @@ class rs2_wrapper:
                     self.publish_frame(frame, crnt_time)
             [[frame.get_profile().stream_type(), frame.get_profile().stream_index()] for frame in frames]
 
-        ddynrec = DDynamicReconfigure("example_dyn_rec")
-        ddynrec.start(dyn_rec_callback)
 
 def init():
     rospy.init_node('rs2_camera', anonymous=True)
