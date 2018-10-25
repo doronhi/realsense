@@ -63,15 +63,19 @@ class rs2_wrapper:
                 continue
             if self.is_checkbox(sensor, option):
                 self.ddynrec[name].add_variable(option_str, sensor.get_option_description(option), bool(sensor.get_option(option)))
-            elif self.is_enum_option(sensor, option):
-                enum_method = self.get_enum_method(sensor, option)
+                continue
+            enum_method = self.get_enum_method(sensor, option)
+            if enum_method == "":
+                self.ddynrec[name].add_variable(option_str, sensor.get_option_description(option),
+                                                sensor.get_option(option),
+                                                sensor.get_option_range(option).min,
+                                                sensor.get_option_range(option).max)
+            else:
                 self.ddynrec[name].add_variable(option_str, sensor.get_option_description(option),
                                                 int(sensor.get_option(option)),
                                                 int(sensor.get_option_range(option).min),
                                                 int(sensor.get_option_range(option).max),
                                                 edit_method=enum_method)
-            else:
-                self.ddynrec[name].add_variable(option_str, sensor.get_option_description(option), sensor.get_option(option), sensor.get_option_range(option).min, sensor.get_option_range(option).max)
         self.ddynrec[name].start(self.create_callback(sensor))
 
     def is_checkbox(self, sensor, option):
@@ -82,7 +86,6 @@ class rs2_wrapper:
         op_range = sensor.get_option_range(option)
         if op_range.step != 1.0:
             return False
-        op_range = sensor.get_option_range(option)
         for val in range(int(op_range.min), int(op_range.max + 1), int(op_range.step)):
             if sensor.get_option_value_description(option, val) is None:
                 return False
