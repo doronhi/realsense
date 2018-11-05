@@ -5,6 +5,7 @@ import sensor_msgs.msg
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
 import constants
+import json
 
 
 def say(name):
@@ -30,11 +31,13 @@ stream_to_format = {rs.stream.depth: rs.format.z16,
 class rs2_wrapper:
     def __init__(self):
         self.pipeline = self.get_pipeline()
+        self.set_initial_params()
+        self.start_filters()
         self.publish_options()
+
         self.publishers = dict()
         self.bridge = CvBridge()
         self.seq = dict()   # Will contain sequential number for each topic key (stream, index, format)
-        self.set_initial_params()
         self.camera_info = dict()
 
     def create_callback(self, sensor):
@@ -48,6 +51,22 @@ class rs2_wrapper:
                     sensor.set_option(option ,value)
             return config
         return callback
+
+    def start_filters(self):
+        self.filters = []
+        # import pdb; pdb.set_trace()
+        # filters_info = json.loads(rospy.get_param('~filters_info', '{}'));
+        filters_str = rospy.get_param('~filters', '')
+        for filter_str in filters_str.split(','):
+            self.add_filter(filter_str)
+
+    def add_filter(self, filter_str):
+        filter_types = {'colorizer': rs.colorizer(),
+                        'temporal': rs.temporal_filter()}
+        if filter_str in filter_types:
+            self.filters.append({'name': filter_str, 'filter': filter_types[filter_str]})
+
+
 
     def publish_options(self):
         self.ddynrec = dict()
@@ -137,6 +156,13 @@ class rs2_wrapper:
              (rs.stream.fisheye, 0, rs.format.raw8): rospy.get_param('~aligned_depth_to_fisheye_frame_id', constants.DEFAULT_ALIGNED_DEPTH_TO_FISHEYE_FRAME_ID),
              }
 
+    def get_frame_id(self, normal_dict, pr):
+        try:
+            frame_id = normal_dict[(pr.stream_type(), pr.stream_index(), pr.format())]
+        except:
+            frame_id = normal_dict[(pr.stream_type(), pr.stream_index(), stream_to_format[pr.stream_type()])] + '_' + format_to_cvtype[pr.format()]
+        return frame_id
+
     def get_camera_info(self, frame):
         video_profile = frame.as_video_frame().get_profile()
         intrinsic = video_profile.as_video_stream_profile().get_intrinsics()
@@ -145,7 +171,7 @@ class rs2_wrapper:
 
         cam_info.width = intrinsic.width
         cam_info.height = intrinsic.height
-        cam_info.header.frame_id = self.optical_frame_id[(video_profile.stream_type(), video_profile.stream_index(), video_profile.format())]
+        cam_info.header.frame_id = self.get_frame_id(self.optical_frame_id, video_profile)
         cam_info.K = [intrinsic.fx, 0.0, intrinsic.ppx,
                       0.0, intrinsic.fy, intrinsic.ppy,
                       0.0, 0.0, 1.0]
@@ -201,7 +227,8 @@ class rs2_wrapper:
         pr = sample_frame.get_profile()
         name = type_to_name[pr.stream_type()] + (str(pr.stream_index()) if pr.stream_index() > 0 else '')
         rect = 'rect_' if pr.stream_type() in [rs.stream.depth, rs.stream.infrared] else ''
-        topic_name = '%s/image_%sraw' % (name, rect)
+        format_str = 'raw' if stream_to_format[pr.stream_type()] == pr.format() else format_to_cvtype[pr.format()]
+        topic_name = '%s/image_%s%s' % (name, rect, format_str)
         return rospy.Publisher(topic_name, sensor_msgs.msg.Image, queue_size=1)
 
     def start_info_publisher(self, sample_frame):
@@ -219,7 +246,7 @@ class rs2_wrapper:
         if publisher.get_num_connections():
             pr = frame.get_profile()
             imgc = self.bridge.cv2_to_imgmsg(np.asarray(frame.get_data()), format_to_cvtype[pr.format()])
-            imgc.header.frame_id = self.optical_frame_id[(pr.stream_type(), pr.stream_index(), pr.format())]
+            imgc.header.frame_id = self.get_frame_id(self.optical_frame_id, pr)
             imgc.header.stamp = crnt_time
             imgc.header.seq = seq
             publisher.publish(imgc)
@@ -238,12 +265,16 @@ class rs2_wrapper:
             # rospy.loginfo('Got frames:')
             # print '\n'.join(['type: %s, index: %d, format %s' % (frame.get_profile().stream_type(), frame.get_profile().stream_index(), frame.get_profile().format) for frame in frames])
             crnt_time = rospy.Time.now()
+            for filter in self.filters:
+                frames = filter['filter'].process(frames).as_frameset()
+
             for frame in frames:
+
                 if frame.is_points():
                     rospy.logerror('publish pointcloud is not implemented.')
                 else:
                     self.publish_frame(frame, crnt_time)
-            [[frame.get_profile().stream_type(), frame.get_profile().stream_index()] for frame in frames]
+            # [[frame.get_profile().stream_type(), frame.get_profile().stream_index()] for frame in frames]
 
 
 def init():
