@@ -58,8 +58,23 @@ class rs2_wrapper:
         # import pdb; pdb.set_trace()
         # filters_info = json.loads(rospy.get_param('~filters_info', '{}'));
         filters_str = rospy.get_param('~filters', '')
+        use_disparity_filter = False
+        use_colorizer_filter = False
         for filter_str in filters_str.split(','):
-            self.add_filter(filter_str)
+            if filter_str == 'disparity':
+                use_disparity_filter = True
+            elif filter_str == 'colorizer':
+                use_colorizer_filter = True
+            else:
+                self.add_filter(filter_str)
+
+        if use_disparity_filter:
+            rospy.loginfo('Add Filter: disparity')
+            self.filters = [{'name': 'disparity_start', 'filter': rs.disparity_transform()}] + self.filters
+            self.filters.append({'name': 'disparity_end', 'filter': rs.disparity_transform(False)})
+            rospy.loginfo('Done add Filter: disparity')
+        if use_colorizer_filter:
+            self.add_filter('colorizer')
 
     def add_filter(self, filter_str):
         filter_types = {'colorizer': rs.colorizer(),
@@ -104,8 +119,10 @@ class rs2_wrapper:
                                                 sensor.get_option_range(option).max)
 
         # self.ddynrec[name].dyn_rec_srv = Server(self.ddynrec[name].get_type(), self.create_callback(sensor, name), namespace='_'.join(name.split()))
-        #import pdb; pdb.set_trace()
-        self.ddynrec[name].start(self.create_callback(sensor, name))
+        # import pdb; pdb.set_trace()
+        if self.ddynrec[name].get_variable_names():
+            self.ddynrec[name].start(self.create_callback(sensor, name))
+
 
     def is_checkbox(self, sensor, option):
         op_range = sensor.get_option_range(option)
