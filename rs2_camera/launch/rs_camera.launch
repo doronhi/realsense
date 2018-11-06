@@ -41,6 +41,7 @@
   <arg name="align_depth"         default="false"/>
 
   <arg name="filters"             default=""/>
+  <arg name="filters_info"        default='{"name": "doron"}'/>
 
   <group ns="$(arg camera)">
     <include file="$(find rs2_camera)/launch/includes/nodelet.launch.xml">
@@ -84,6 +85,7 @@
       <arg name="enable_imu"               value="$(arg enable_imu)"/>
 
       <arg name="filters"                  value="$(arg filters)"/>
+      <arg name="filters_info"             value="$(arg filters_info)"/>
     </include>
   </group>
 </launch>

@@ -68,6 +68,7 @@
   <arg name="aligned_depth_to_fisheye_frame_id"    default="$(arg tf_prefix)_aligned_depth_to_fisheye_frame"/>
 
   <arg name="filters"             default=""/>
+  <arg name="filters_info"        default="{}"/>
 
 
   <node pkg="rs2_camera" type="hello" name="hello" args="" output="screen">
@@ -130,6 +131,8 @@
     <param name="aligned_depth_to_fisheye_frame_id" type="str"  value="$(arg aligned_depth_to_fisheye_frame_id)"/>
     
     <param name="filters" type="str"  value="$(arg filters)"/>
+    <param name="filters_info" type="str"  value="$(arg filters_info)"/>
+
   </node>
 </launch>
 
