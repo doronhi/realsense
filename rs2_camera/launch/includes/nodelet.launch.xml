@@ -71,7 +71,7 @@
   <arg name="filters_info"        default="{}"/>
 
 
-  <node pkg="rs2_camera" type="hello" name="hello" args="" output="screen">
+  <node pkg="rs2_camera" type="rs2_camera" name="manager" args="" output="screen">
     <param name="serial_no"                type="str"  value="$(arg serial_no)"/>
     <param name="json_file_path"           type="str"  value="$(arg json_file_path)"/>
     <param name="rosbag_filename"          type="str"  value="$(arg rosbag_filename)"/>

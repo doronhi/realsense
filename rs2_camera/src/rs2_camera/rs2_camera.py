@@ -1,4 +1,5 @@
 import rospy
+from dynamic_reconfigure.server import Server
 from ddynamic_reconfigure_python.ddynamic_reconfigure import DDynamicReconfigure
 import pyrealsense2 as rs
 import sensor_msgs.msg
@@ -101,6 +102,9 @@ class rs2_wrapper:
                                                 sensor.get_option(option),
                                                 sensor.get_option_range(option).min,
                                                 sensor.get_option_range(option).max)
+
+        # self.ddynrec[name].dyn_rec_srv = Server(self.ddynrec[name].get_type(), self.create_callback(sensor, name), namespace='_'.join(name.split()))
+        #import pdb; pdb.set_trace()
         self.ddynrec[name].start(self.create_callback(sensor, name))
 
     def is_checkbox(self, sensor, option):

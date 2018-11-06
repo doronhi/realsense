@@ -1,8 +1,8 @@
 #! /usr/bin/env python
 
-import rs2_camera.hello
+import rs2_camera.rs2_camera
 
 
 if __name__ == '__main__':
     #rs2_camera.hello.say('my friend!')
-    rs2_camera.hello.init()
+    rs2_camera.rs2_camera.init()
