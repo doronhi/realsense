@@ -40,14 +40,14 @@ class rs2_wrapper:
         self.seq = dict()   # Will contain sequential number for each topic key (stream, index, format)
         self.camera_info = dict()
 
-    def create_callback(self, sensor):
+    def create_callback(self, sensor, name):
         def callback(config, level):
             for param_name, value in config.items():
                 if param_name not in rs.option.__members__:
                     continue
                 option = rs.option.__members__[param_name]
                 if sensor.get_option(option) != value:
-                    rospy.loginfo('update %s:%s to %s' % (sensor.get_info(rs.camera_info.name), param_name, value))
+                    rospy.loginfo('update %s:%s to %s' % (name, param_name, value))
                     sensor.set_option(option ,value)
             return config
         return callback
@@ -71,10 +71,14 @@ class rs2_wrapper:
     def publish_options(self):
         self.ddynrec = dict()
         for sensor in self.pipeline.get_active_profile().get_device().sensors:
-            self.publish_options_for_sensor(sensor)
+            name = sensor.get_info(rs.camera_info.name)
+            self.publish_options_for_sensor(sensor, name)
+        for filter in self.filters:
+            name = filter['name']
+            self.publish_options_for_sensor(filter['filter'], name)
+        print 'Done publishing dynamic options'
 
-    def publish_options_for_sensor(self, sensor):
-        name = sensor.get_info(rs.camera_info.name)
+    def publish_options_for_sensor(self, sensor, name):
         self.ddynrec[name] = DDynamicReconfigure('_'.join(name.split()))
         for option_m in rs.option.__members__.items():
             option_str, option = option_m
@@ -83,19 +87,21 @@ class rs2_wrapper:
             if self.is_checkbox(sensor, option):
                 self.ddynrec[name].add_variable(option_str, sensor.get_option_description(option), bool(sensor.get_option(option)))
                 continue
-            enum_method = self.get_enum_method(sensor, option)
-            if enum_method == "":
-                self.ddynrec[name].add_variable(option_str, sensor.get_option_description(option),
-                                                sensor.get_option(option),
-                                                sensor.get_option_range(option).min,
-                                                sensor.get_option_range(option).max)
-            else:
+            enum_list = self.get_enum_list(sensor, option)
+            if enum_list:
+                option_name = str(option).split('.')[1]
+                enum_method = self.get_enum_method(self.ddynrec[name], enum_list, option_name)
                 self.ddynrec[name].add_variable(option_str, sensor.get_option_description(option),
                                                 int(sensor.get_option(option)),
                                                 int(sensor.get_option_range(option).min),
                                                 int(sensor.get_option_range(option).max),
                                                 edit_method=enum_method)
-        self.ddynrec[name].start(self.create_callback(sensor))
+            else:
+                self.ddynrec[name].add_variable(option_str, sensor.get_option_description(option),
+                                                sensor.get_option(option),
+                                                sensor.get_option_range(option).min,
+                                                sensor.get_option_range(option).max)
+        self.ddynrec[name].start(self.create_callback(sensor, name))
 
     def is_checkbox(self, sensor, option):
         op_range = sensor.get_option_range(option)
@@ -105,22 +111,26 @@ class rs2_wrapper:
         op_range = sensor.get_option_range(option)
         if op_range.step != 1.0:
             return False
+        if op_range.min < 0 or op_range.max > 1000:
+            return False
         for val in range(int(op_range.min), int(op_range.max + 1), int(op_range.step)):
             if sensor.get_option_value_description(option, val) is None:
                 return False
         return True
 
-    def get_enum_method(self, sensor, option):
-        if not self.is_enum_option(sensor, option):
-            return ""
-        name = sensor.get_info(rs.camera_info.name)
-        op_range = sensor.get_option_range(option)
+    def get_enum_list(self, sensor, option):
         str_list = []
-        for val in range(int(op_range.min), int(op_range.max+1), int(op_range.step)):
-            val_str = sensor.get_option_value_description(option, val)
-            str_list.append(self.ddynrec[name].const(val_str, "int", int(val), val_str))
+        if self.is_enum_option(sensor, option):
+            op_range = sensor.get_option_range(option)
+            for val in range(int(op_range.min), int(op_range.max+1), int(op_range.step)):
+                val_str = sensor.get_option_value_description(option, val)
+                str_list.append([val_str, int(val)])
 
-        enum_method = self.ddynrec[name].enum(str_list, str(option).split('.')[1])
+        return str_list
+
+    def get_enum_method(self, ddynrec, enum_list, option_name):
+        str_list = [ddynrec.const(item[0], "int", item[1], item[0]) for item in enum_list]
+        enum_method = ddynrec.enum(str_list, option_name)
         return enum_method
 
 
