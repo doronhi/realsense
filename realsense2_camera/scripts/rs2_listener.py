@@ -38,7 +38,7 @@ def get_tf(tf_listener, from_id, to_id):
     try:
         start_time = time.time()
         print 'Waiting for transform: %s -> %s for %.2f(sec)' % (from_id, to_id, tf_timeout)
-        tf_listener.waitForTransform(from_id, to_id, rospy.Time())
+        # tf_listener.waitForTransform(from_id, to_id, rospy.Time(), rospy.Duration(tf_timeout))
         res = tf_listener.lookupTransform(from_id, to_id, rospy.Time())
     except Exception as e:
         print 'Failed: ', e
