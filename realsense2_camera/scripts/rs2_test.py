@@ -315,8 +315,8 @@ def run_tests(tests):
 
 def main():
     all_tests = [{'name': 'non_existent_file', 'type': 'no_file', 'params': {'rosbag_filename': '/home/non_existent_file.txt'}},
-                 {'name': 'vis_avg_2', 'type': 'vis_avg', 'params': {'rosbag_filename': './records/outdoors.bag'}},
-                 {'name': 'depth_avg_1', 'type': 'depth_avg', 'params': {'rosbag_filename': './records/outdoors.bag'}},
+                 #{'name': 'vis_avg_2', 'type': 'vis_avg', 'params': {'rosbag_filename': './records/outdoors.bag'}},
+                 #{'name': 'depth_avg_1', 'type': 'depth_avg', 'params': {'rosbag_filename': './records/outdoors.bag'}},
                  {'name': 'depth_w_cloud_1', 'type': 'depth_avg', 'params': {'rosbag_filename': './records/outdoors.bag', 'enable_pointcloud': 'true'}},
                  {'name': 'points_cloud_1', 'type': 'pointscloud_avg', 'params': {'rosbag_filename': './records/outdoors.bag', 'enable_pointcloud': 'true'}},
                  {'name': 'align_depth_color_1', 'type': 'align_depth_color', 'params': {'rosbag_filename': './records/outdoors.bag', 'align_depth': 'true'}},

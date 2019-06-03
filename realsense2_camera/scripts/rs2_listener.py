@@ -37,7 +37,7 @@ def get_tf(tf_listener, from_id, to_id):
     global tf_timeout
     try:
         start_time = time.time()
-        # print 'Waiting for transform: %s -> %s for %.2f(sec)' % (from_id, to_id, tf_timeout)
+        print 'Waiting for transform: %s -> %s for %.2f(sec)' % (from_id, to_id, tf_timeout)
         tf_listener.waitForTransform(from_id, to_id, rospy.Time(), rospy.Duration(tf_timeout))
         res = tf_listener.lookupTransform(from_id, to_id, rospy.Time())
     except Exception as e:
@@ -127,13 +127,17 @@ class CWaitForMessage:
                     self.listener = tf.TransformListener()
                 all_frames = self.listener.allFramesAsString()
                 try:
+                    print 'all: ', all_frames
                     frame_ids = [re.search('Frame (.+) exists with parent (.+).', x).groups() for x in all_frames.split('\n') if x]
                     frame_ids = set(itertools.chain.from_iterable(frame_ids))
+                    print 'frame_ids: ', all_frames
                     self.func_data[theme_name].setdefault('static_tf', {})
                     self.func_data[theme_name]['static_tf'].update(dict([(xx, get_tf(self.listener, xx[0], xx[1])) for xx in itertools.permutations(frame_ids, 2)]))
+                    print 'added static tf'
                 except Exception as e:
                     print 'Failed to parse:', e
-
+                global tf_timeout
+                tf_timeout = 15
         return _imageColorCallback
 
     def imageDepthCallback(self, data):
