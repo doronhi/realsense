@@ -12,9 +12,6 @@ import rospy
 import time
 import rosservice
 
-global tf_timeout
-tf_timeout = 15
-
 def ImuGetData(rec_filename, topic):
     # res['value'] = first value of topic.
     # res['max_diff'] = max difference between returned value and all other values of topic in recording.
@@ -186,8 +183,9 @@ def PointCloudTest(data, gt_data):
 
 
 def staticTFTest(data, gt_data):
+    data = data['static_tf']
     for couple in gt_data.keys():
-        if data[couple] is None:
+        if couple not in data or data[couple] is None:
             msg = 'Tf is None for couple %s' % '->'.join(couple)
             return False, msg
         if any(abs((np.array(data[couple][0]) - np.array(gt_data[couple][0]))) > 1e-5) or \
@@ -261,22 +259,6 @@ def print_results(results):
     print
 
 
-def get_tf(tf_listener, from_id, to_id):
-    global tf_timeout
-    try:
-        start_time = time.time()
-        print 'Waiting for transform: %s -> %s for %.2f(sec)' % (from_id, to_id, tf_timeout)
-        tf_listener.waitForTransform(from_id, to_id, rospy.Time(), rospy.Duration(tf_timeout))
-        res = tf_listener.lookupTransform(from_id, to_id, rospy.Time())
-    except Exception as e:
-        print 'Failed: ', e
-        res = e.message
-    finally:
-        waited_for = time.time() - start_time
-        tf_timeout = max(0.0, tf_timeout - waited_for)
-        return res
-
-
 def run_tests(tests):
     msg_params = {'timeout_secs': 5}
     results = []
@@ -311,14 +293,6 @@ def run_tests(tests):
 
         if is_node_up:
             listener_res = msg_retriever.wait_for_messages(themes)
-            if 'static_tf' in [test['type'] for test in rec_tests]:
-                print 'Gathering static transforms'
-                frame_ids = ['camera_link', 'camera_depth_frame', 'camera_infra1_frame', 'camera_infra2_frame', 'camera_color_frame', 'camera_fisheye_frame', 'camera_pose']
-                tf_listener = tf.TransformListener()
-                print 'after 0 secs:\n' + tf_listener.allFramesAsString()
-                time.sleep(10)
-                print 'after 10 secs:\n' + tf_listener.allFramesAsString()
-                listener_res['static_tf'] = dict([(xx, get_tf(tf_listener, xx[0], xx[1])) for xx in itertools.combinations(frame_ids, 2)])
             print '*'*8 + ' Killing ROS ' + '*'*9
             p_wrapper.terminate()
             p_wrapper.wait()

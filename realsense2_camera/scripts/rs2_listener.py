@@ -11,7 +11,11 @@ import inspect
 import ctypes
 import struct
 import tf
+import itertools
+import re
 
+global tf_timeout
+tf_timeout = 15
 
 def pc2_to_xyzrgb(point):
 	# Thanks to Panos for his code used in this function.
@@ -27,6 +31,22 @@ def pc2_to_xyzrgb(point):
     g = (pack & 0x0000FF00) >> 8
     b = (pack & 0x000000FF)
     return x, y, z, r, g, b
+
+
+def get_tf(tf_listener, from_id, to_id):
+    global tf_timeout
+    try:
+        start_time = time.time()
+        # print 'Waiting for transform: %s -> %s for %.2f(sec)' % (from_id, to_id, tf_timeout)
+        tf_listener.waitForTransform(from_id, to_id, rospy.Time(), rospy.Duration(tf_timeout))
+        res = tf_listener.lookupTransform(from_id, to_id, rospy.Time())
+    except Exception as e:
+        print 'Failed: ', e
+        res = e.message
+    finally:
+        waited_for = time.time() - start_time
+        tf_timeout = max(0.0, tf_timeout - waited_for)
+        return res
 
 
 class CWaitForMessage:
@@ -46,7 +66,7 @@ class CWaitForMessage:
                        'pointscloud': {'topic': '/camera/depth/color/points', 'callback': self.pointscloudCallback, 'msg_type': msg_PointCloud2},
                        'alignedDepthInfra1': {'topic': '/camera/aligned_depth_to_infra1/image_raw', 'callback': self.imageColorCallback, 'msg_type': msg_Image},
                        'alignedDepthColor': {'topic': '/camera/aligned_depth_to_color/image_raw', 'callback': self.imageColorCallback, 'msg_type': msg_Image},
-                       'static_tf': {'topic': '/camera/aligned_depth_to_color/image_raw', 'callback': self.imageColorCallback, 'msg_type': msg_Image},
+                       'static_tf': {'topic': '/camera/color/image_raw', 'callback': self.imageColorCallback, 'msg_type': msg_Image},
                        'accelStream': {'topic': '/camera/accel/sample', 'callback': self.imuCallback, 'msg_type': msg_Imu},
                        }
 
@@ -101,6 +121,19 @@ class CWaitForMessage:
             self.func_data[theme_name]['num_channels'].append(channels)
             self.func_data[theme_name]['shape'].append(cv_image.shape)
             self.func_data[theme_name]['reported_size'].append((data.width, data.height, data.step))
+
+            if theme_name == 'static_tf':
+                if self.listener is None:
+                    self.listener = tf.TransformListener()
+                all_frames = self.listener.allFramesAsString()
+                try:
+                    frame_ids = [re.search('Frame (.+) exists with parent (.+).', x).groups() for x in all_frames.split('\n') if x]
+                    frame_ids = set(itertools.chain.from_iterable(frame_ids))
+                    self.func_data[theme_name].setdefault('static_tf', {})
+                    self.func_data[theme_name]['static_tf'].update(dict([(xx, get_tf(self.listener, xx[0], xx[1])) for xx in itertools.permutations(frame_ids, 2)]))
+                except Exception as e:
+                    print 'Failed to parse:', e
+
         return _imageColorCallback
 
     def imageDepthCallback(self, data):
