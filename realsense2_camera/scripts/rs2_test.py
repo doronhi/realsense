@@ -315,6 +315,9 @@ def run_tests(tests):
                 print 'Gathering static transforms'
                 frame_ids = ['camera_link', 'camera_depth_frame', 'camera_infra1_frame', 'camera_infra2_frame', 'camera_color_frame', 'camera_fisheye_frame', 'camera_pose']
                 tf_listener = tf.TransformListener()
+                print 'after 0 secs:\n' + tf_listener.allFramesAsString()
+                time.sleep(10)
+                print 'after 10 secs:\n' + tf_listener.allFramesAsString()
                 listener_res['static_tf'] = dict([(xx, get_tf(tf_listener, xx[0], xx[1])) for xx in itertools.combinations(frame_ids, 2)])
             print '*'*8 + ' Killing ROS ' + '*'*9
             p_wrapper.terminate()
