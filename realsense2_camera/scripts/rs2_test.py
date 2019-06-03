@@ -13,7 +13,7 @@ import time
 import rosservice
 
 global tf_timeout
-tf_timeout = 5
+tf_timeout = 15
 
 def ImuGetData(rec_filename, topic):
     # res['value'] = first value of topic.
@@ -265,11 +265,12 @@ def get_tf(tf_listener, from_id, to_id):
     global tf_timeout
     try:
         start_time = time.time()
-        # print 'Waiting for transform: %s -> %s for %.2f(sec)' % (from_id, to_id, tf_timeout)
+        print 'Waiting for transform: %s -> %s for %.2f(sec)' % (from_id, to_id, tf_timeout)
         tf_listener.waitForTransform(from_id, to_id, rospy.Time(), rospy.Duration(tf_timeout))
         res = tf_listener.lookupTransform(from_id, to_id, rospy.Time())
     except Exception as e:
-        res = None
+        print 'Failed: ', e
+        res = e.message
     finally:
         waited_for = time.time() - start_time
         tf_timeout = max(0.0, tf_timeout - waited_for)
