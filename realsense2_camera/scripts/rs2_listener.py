@@ -38,7 +38,7 @@ def get_tf(tf_listener, from_id, to_id):
     try:
         start_time = time.time()
         print 'Waiting for transform: %s -> %s for %.2f(sec)' % (from_id, to_id, tf_timeout)
-        tf_listener.waitForTransform(from_id, to_id, rospy.Time(), rospy.Duration(tf_timeout))
+        tf_listener.waitForTransform(from_id, to_id, rospy.Time())
         res = tf_listener.lookupTransform(from_id, to_id, rospy.Time())
     except Exception as e:
         print 'Failed: ', e
@@ -83,7 +83,8 @@ class CWaitForMessage:
                 frame_id = data.header.frame_id
                 value = data.linear_acceleration
 
-                (trans,rot) = self.listener.lookupTransform('/camera_link', frame_id, rospy.Time(0))
+                # (trans,rot) = self.listener.lookupTransform('/camera_link', frame_id, rospy.Time(0))
+                (trans,rot) = get_tf(self.listener, '/camera_link', frame_id)
                 quat = tf.transformations.quaternion_matrix(rot)
                 point = np.matrix([value.x, value.y, value.z, 1], dtype='float32')
                 point.resize((4, 1))
@@ -161,8 +162,8 @@ class CWaitForMessage:
                 # Known issue - 1st pointcloud published has invalid texture. Skip 1st frame.
                 return
 
-            if len(self.func_data[theme_name]['width']) > 0:
-                return
+            # if len(self.func_data[theme_name]['width']) > 0:
+            #     return
 
             try:
                 points = np.array([pc2_to_xyzrgb(pp) for pp in pc2.read_points(data, skip_nans=True, field_names=("x", "y", "z", "rgb")) if pp[0] > 0])
