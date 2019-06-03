@@ -83,8 +83,8 @@ class CWaitForMessage:
                 frame_id = data.header.frame_id
                 value = data.linear_acceleration
 
-                # (trans,rot) = self.listener.lookupTransform('/camera_link', frame_id, rospy.Time(0))
-                (trans,rot) = get_tf(self.listener, '/camera_link', frame_id)
+                (trans,rot) = self.listener.lookupTransform('/camera_link', frame_id, rospy.Time(0))
+                # (trans,rot) = get_tf(self.listener, '/camera_link', frame_id)
                 quat = tf.transformations.quaternion_matrix(rot)
                 point = np.matrix([value.x, value.y, value.z, 1], dtype='float32')
                 point.resize((4, 1))
@@ -134,7 +134,8 @@ class CWaitForMessage:
                     frame_ids = ['camera_link', 'camera_depth_frame', 'camera_infra1_frame', 'camera_color_frame']
                     print 'frame_ids: ', frame_ids
                     self.func_data[theme_name].setdefault('static_tf', {})
-                    self.func_data[theme_name]['static_tf'].update(dict([(xx, get_tf(self.listener, xx[0], xx[1])) for xx in itertools.combinations(frame_ids, 2)]))
+                    self.func_data[theme_name]['static_tf'].update(dict([(xx, self.listener.lookupTransform('/'+xx[0], '/'+xx[1], rospy.Time(0))) for xx in itertools.combinations(frame_ids, 2)]))
+                    # self.func_data[theme_name]['static_tf'].update(dict([(xx, get_tf(self.listener, '/'+xx[0], '/'+xx[1])) for xx in itertools.combinations(frame_ids, 2)]))
                     print 'added static tf'
                 except Exception as e:
                     print 'Failed to parse:', e
