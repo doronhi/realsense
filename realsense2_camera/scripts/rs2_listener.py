@@ -128,11 +128,12 @@ class CWaitForMessage:
                 all_frames = self.listener.allFramesAsString()
                 try:
                     print 'all: ', all_frames
-                    frame_ids = [re.search('Frame (.+) exists with parent (.+).', x).groups() for x in all_frames.split('\n') if x]
-                    frame_ids = set(itertools.chain.from_iterable(frame_ids))
-                    print 'frame_ids: ', all_frames
+                    # frame_ids = [re.search('Frame (.+) exists with parent (.+).', x).groups() for x in all_frames.split('\n') if x]
+                    # frame_ids = list(set(itertools.chain.from_iterable(frame_ids)))
+                    frame_ids = ['camera_link', 'camera_depth_frame', 'camera_infra1_frame', 'camera_color_frame']
+                    print 'frame_ids: ', frame_ids
                     self.func_data[theme_name].setdefault('static_tf', {})
-                    self.func_data[theme_name]['static_tf'].update(dict([(xx, get_tf(self.listener, xx[0], xx[1])) for xx in itertools.permutations(frame_ids, 2)]))
+                    self.func_data[theme_name]['static_tf'].update(dict([(xx, get_tf(self.listener, xx[0], xx[1])) for xx in itertools.combinations(frame_ids, 2)]))
                     print 'added static tf'
                 except Exception as e:
                     print 'Failed to parse:', e
