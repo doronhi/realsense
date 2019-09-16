@@ -109,7 +109,7 @@ The topics are of the form: ```/camera/aligned_depth_to_color/image_raw``` etc.
 - **All the rest of the frame_ids can be found in the template launch file: [nodelet.launch.xml](./realsense2_camera/launch/includes/nodelet.launch.xml)**
 - **unite_imu_method**: The D435i and T265 cameras have built in IMU components which produce 2 unrelated streams: *gyro* - which shows angular velocity and *accel* which shows linear acceleration. Each with it's own frequency. By default, 2 corresponding topics are available, each with only the relevant fields of the message sensor_msgs::Imu are filled out.
 Setting *unite_imu_method* creates a new topic, *imu*, that replaces the default *gyro* and *accel* topics. Under the new topic, all the fields in the Imu message are filled out.
-   - **linear_interpolation**: Each message contains the last original value of item A interpolated with the previous value of item A, combined with the last original value of item B on last item B's timestamp. Items A and B are accel and gyro interchangeably, according to which type recently arrived from the sensor. The idea is to give the most recent information, united and without repetitions.
+   - **linear_interpolation**: Each message contains the last original value of item A interpolated with the previous value of item A, combined with the last original value of item B on last item B's timestamp. Items A and B are accel and gyro interchangeably, according to which type recently arrived from the sensor. The idea is to give the most recent information, united and without repetitions. See Appendix A for a more detailed example
    - **copy**: For each new message, accel or gyro, the relevant fields and timestamp are filled out while the others maintain the previous data.
 - **clip_distance**: remove from the depth image all values above a given value (meters). Disable by giving negative value (default)
 - **linear_accel_cov**, **angular_velocity_cov**: sets the variance given to the Imu readings. For the T265, these values are being modified by the inner confidence value.
@@ -253,3 +253,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 **Other names and brands may be claimed as the property of others*
+
+# Appendix A - a linear_interpolation example
+To better understand what happens when setting "unite_imu_method" option to "linear_interpolation", consider the following scenario:</br>
+
+accel messages arrive at 63Hz. Gyro at 200Hz.
+- A1 means a message of type A (gyro) at time 1
+- B2 means a message of type B (accel) at time 2.
+
+```
+A messages: A1............A3................A6.......A8..........A10
+B messages: B1......B2.......B4......B5......B7......B8......B9
+
+time line:  t1......t2....t3.t4......t5.....t6.......t8......t9..t10...
+```
+Below is the content of the united messages at each time stamp:
+
+- t3: Arrived A3: send [interpolate(A3, A1 at t2), B2] with timestamp of t2.
+- t4: Arrived B4: send [A3, interpolate(B4, B2 at t3)] with timestamp of t3.
+- t5: Arrived B5: no new update for A so no message.
+- t6: Arrived A6: send [interpolate(A6, A3 at t5), B5] with timestamp of t5.
+
+Looking at timestamp t5, its clear to see that when 2 messages of the same type (B in this example) arrive with no message of the other type (A) in between, no new united message will be generated. Therefor, the rate of the united messages is expected to be about twice the lower frame rate (i.e. 2*63 = 126 Hz)
