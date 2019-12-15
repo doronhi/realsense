@@ -88,10 +88,11 @@
   <arg name="initial_reset"            default="false"/>
   <arg name="unite_imu_method"         default="none"/> <!-- Options are: [none, copy, linear_interpolation] -->
   <arg name="allow_no_texture_points"  default="false"/>
+  <arg name="node_start_delay"         default="0.0"/>
 
 
   <node unless="$(arg external_manager)" pkg="nodelet" type="nodelet" name="$(arg manager)" args="manager" output="screen" required="$(arg required)"/>
-  <node pkg="nodelet" type="nodelet" name="realsense2_camera" args="load realsense2_camera/RealSenseNodeFactory $(arg manager)" required="$(arg required)">
+  <node pkg="nodelet" type="nodelet" name="realsense2_camera" args="load realsense2_camera/RealSenseNodeFactory $(arg manager)" required="$(arg required)" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@' ">
     <param name="serial_no"                type="str"  value="$(arg serial_no)"/>
     <param name="usb_port_id"              type="str"  value="$(arg usb_port_id)"/>
     <param name="device_type"              type="str"  value="$(arg device_type)"/>

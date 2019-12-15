@@ -23,6 +23,7 @@
       <arg name="serial_no"             value="$(arg serial_no_camera2)"/>
       <arg name="tf_prefix"		          value="$(arg tf_prefix_camera2)"/>
       <arg name="initial_reset"         value="$(arg initial_reset)"/>
+      <arg name="node_start_delay"      value="2.0"/>
     </include>
   </group>
 
@@ -31,6 +32,7 @@
       <arg name="serial_no"             value="$(arg serial_no_camera3)"/>
       <arg name="tf_prefix"		          value="$(arg tf_prefix_camera3)"/>
       <arg name="initial_reset"         value="$(arg initial_reset)"/>
+      <arg name="node_start_delay"      value="4.0"/>
     </include>
   </group>
 </launch>

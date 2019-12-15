@@ -43,6 +43,7 @@
       <arg name="depth_width"           value="$(arg depth_width)"/>
       <arg name="depth_height"          value="$(arg depth_height)"/>
       <arg name="clip_distance"         value="$(arg clip_distance)"/>
+      <arg name="node_start_delay"      value="2.0"/>
     </include>
   </group>
   <node pkg="tf" type="static_transform_publisher" name="t265_to_d400" args="0 0 0 0 0 0 /$(arg tf_prefix_camera1)_link /$(arg tf_prefix_camera2)_link 100"/>
