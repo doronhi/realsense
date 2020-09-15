@@ -78,11 +78,13 @@ size_t SyncedImuPublisher::getNumSubscribers()
 }
 
 BaseRealSenseNode::BaseRealSenseNode(rclcpp::Node& node,
-                                    rs2::device dev, const std::string& serial_no) :
+                                    rs2::device dev, const std::string& serial_no,
+                                    std::shared_ptr<diagnostic_updater::Updater> diagnostic_updater) :
     _ros_clock(RCL_ROS_TIME),
-    _base_frame_id(""),
+    _is_running(true), _base_frame_id(""),
     _node(node),
     _logger(rclcpp::get_logger("RealSenseCameraNode")),
+    _rs_diagnostic_updater(diagnostic_updater, serial_no),
     _dev(dev),
     _json_file_path(""),
     _serial_no(serial_no),
@@ -150,6 +152,13 @@ void BaseRealSenseNode::clean()
     }
     if (_tf_t)
         _tf_t->join();
+
+    _is_running = false;
+    _cv.notify_one();
+    if (_monitoring_t && _monitoring_t->joinable())
+    {
+        _monitoring_t->join();
+    }
 
     std::set<std::string> module_names;
     for (const std::pair<stream_index_pair, std::vector<rs2::stream_profile>>& profile : _enabled_profiles)
@@ -234,6 +243,7 @@ void BaseRealSenseNode::publishTopics()
     registerAutoExposureROIOptions();
     publishStaticTransforms();
     publishIntrinsics();
+    startMonitoring();
     ROS_INFO_STREAM("RealSense Node Is Up!");
 }
 
@@ -899,7 +909,9 @@ void BaseRealSenseNode::setupPublishers()
             image_raw << stream_name << "/image_" << ((rectified_image)?"rect_":"") << "raw";
             camera_info << stream_name << "/camera_info";
 
-            _image_publishers[stream] = {image_transport::create_publisher(&_node, image_raw.str(), rmw_qos_profile_sensor_data)};
+            _rs_diagnostic_updater.Add(stream_name, diagnostic_updater::FrequencyStatusParam(&_fps[stream], &_fps[stream]));
+            
+            _image_publishers[stream] = {image_transport::create_publisher(&_node, image_raw.str(), rmw_qos_profile_sensor_data), stream_name};
             _info_publisher[stream] = _node.create_publisher<sensor_msgs::msg::CameraInfo>(camera_info.str(), 1);
 
             if (_align_depth && (stream != DEPTH) && stream.second < 2)
@@ -909,7 +921,8 @@ void BaseRealSenseNode::setupPublishers()
                 aligned_camera_info << "aligned_depth_to_" << stream_name << "/camera_info";
 
                 std::string aligned_stream_name = "aligned_depth_to_" + stream_name;
-                _depth_aligned_image_publishers[stream] = {image_transport::create_publisher(&_node, aligned_image_raw.str(), rmw_qos_profile_sensor_data)};
+                _rs_diagnostic_updater.Add(aligned_stream_name, diagnostic_updater::FrequencyStatusParam(&_fps[stream], &_fps[stream]));
+                _depth_aligned_image_publishers[stream] = {image_transport::create_publisher(&_node, aligned_image_raw.str(), rmw_qos_profile_sensor_data), aligned_stream_name};
                 _depth_aligned_info_publisher[stream] = _node.create_publisher<sensor_msgs::msg::CameraInfo>(aligned_camera_info.str(), 1);
             }
 
@@ -989,7 +1002,7 @@ void BaseRealSenseNode::publishAlignedDepthToOthers(rs2::frameset frames, const 
         auto& image_publisher = _depth_aligned_image_publishers.at(sip);
 
         if(0 != info_publisher->get_subscription_count() ||
-           0 != image_publisher.getNumSubscribers())
+           0 != image_publisher.first.getNumSubscribers())
         {
             std::shared_ptr<rs2::align> align;
             try{
@@ -2268,7 +2281,7 @@ void BaseRealSenseNode::publishFrame(rs2::frame f, const rclcpp::Time& t,
                                      const stream_index_pair& stream,
                                      std::map<stream_index_pair, cv::Mat>& images,
                                      const std::map<stream_index_pair, rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr>& info_publishers,
-                                     const std::map<stream_index_pair, image_transport::Publisher>& image_publishers,
+                                     const std::map<stream_index_pair, ImagePublisherWithFrequencyDiagnostics>& image_publishers,
                                      std::map<stream_index_pair, int>& seq,
                                      std::map<stream_index_pair, sensor_msgs::msg::CameraInfo>& camera_info,
                                      const std::map<stream_index_pair, std::string>& optical_frame_id,
@@ -2302,7 +2315,7 @@ void BaseRealSenseNode::publishFrame(rs2::frame f, const rclcpp::Time& t,
     auto& info_publisher = info_publishers.at(stream);
     auto& image_publisher = image_publishers.at(stream);
     if(0 != info_publisher->get_subscription_count() ||
-       0 != image_publisher.getNumSubscribers())
+       0 != image_publisher.first.getNumSubscribers())
     {
         sensor_msgs::msg::Image::SharedPtr img;
         img = cv_bridge::CvImage(std_msgs::msg::Header(), encoding.at(stream.first), image).toImageMsg();
@@ -2321,7 +2334,8 @@ void BaseRealSenseNode::publishFrame(rs2::frame f, const rclcpp::Time& t,
         cam_info.header.stamp = t;
         info_publisher->publish(cam_info);
 
-        image_publisher.publish(img);
+        image_publisher.first.publish(img);
+        _rs_diagnostic_updater.Tick(image_publisher.second);
         ROS_DEBUG("%s stream published", rs2_stream_to_string(f.get_profile().stream_type()));
     }
 }
@@ -2338,4 +2352,42 @@ bool BaseRealSenseNode::getEnabledProfile(const stream_index_pair& stream_index,
 
     profile =  *it;
     return true;
+}
+
+void BaseRealSenseNode::startMonitoring()
+{
+    int time_interval(10000);
+    std::function<void()> func = [this, time_interval](){
+        std::mutex mu;
+        std::unique_lock<std::mutex> lock(mu);
+        while(_is_running) {
+            _cv.wait_for(lock, std::chrono::milliseconds(time_interval), [&]{return !_is_running;});
+            if (_is_running)
+            {
+                publish_temperature();
+            }
+        }
+    };
+    _monitoring_t = std::make_shared<std::thread>(func);
+}
+
+void BaseRealSenseNode::publish_temperature()
+{
+    rs2::options sensor(_sensors[_base_stream]);
+    for (rs2_option option : _monitor_options)
+    {
+        if (sensor.supports(option))
+        {
+            std::string name(rs2_option_to_string(option));
+            try
+            {
+                auto option_value = sensor.get_option(option);
+                _rs_diagnostic_updater.update_temperatue(name, option_value);
+            }
+            catch(const std::exception& e)
+            {
+                ROS_DEBUG_STREAM("Failed checking for temperature - " << name << std::endl << e.what());
+            }
+        }
+    }
 }
