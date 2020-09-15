@@ -311,6 +311,12 @@ void RealSenseNodeFactory::startDevice()
 	if (_realSenseNode) _realSenseNode.reset();
 	std::string pid_str(_device.get_info(RS2_CAMERA_INFO_PRODUCT_ID));
 	uint16_t pid = std::stoi(pid_str, 0, 16);
+	if (!_diagnostic_updater)
+	{
+		ROS_DEBUG("diagnostic_updater::Updater");
+		_diagnostic_updater = std::make_shared<diagnostic_updater::Updater>(this);
+		_diagnostic_updater->setHardwareID(_serial_no);
+	}
 	try
 	{
 		switch(pid)
@@ -334,7 +340,7 @@ void RealSenseNodeFactory::startDevice()
 		case RS_USB2_PID:
 		case RS_L515_PID_PRE_PRQ:
 		case RS_L515_PID:
-			_realSenseNode = std::unique_ptr<BaseRealSenseNode>(new BaseRealSenseNode(*this, _device, _serial_no));
+			_realSenseNode = std::unique_ptr<BaseRealSenseNode>(new BaseRealSenseNode(*this, _device, _serial_no, _diagnostic_updater));
 			break;
 		// case RS_T265_PID:
 		// 	_realSenseNode = std::unique_ptr<T265RealsenseNode>(new T265RealsenseNode(nh, privateNh, _device, _serial_no));
