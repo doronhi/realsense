@@ -58,6 +58,7 @@ install:
   
   # Run test:
 script:
+  - pip install python-pcl
   - $_python src/realsense/realsense2_camera/scripts/rs2_test.py --all
 
 

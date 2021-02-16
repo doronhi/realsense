@@ -11,6 +11,7 @@ import inspect
 import ctypes
 import struct
 import tf
+import pcl
 try:
     from theora_image_transport.msg import Packet as msg_theora
 except Exception:
@@ -123,22 +124,33 @@ class CWaitForMessage:
             self.func_data[theme_name].setdefault('size', [])
             self.func_data[theme_name].setdefault('width', [])
             self.func_data[theme_name].setdefault('height', [])
-            # until parsing pointcloud is done in real time, I'll use only the first frame.
             self.func_data[theme_name]['frame_counter'] += 1
 
-            if self.func_data[theme_name]['frame_counter'] == 1:
-                # Known issue - 1st pointcloud published has invalid texture. Skip 1st frame.
-                return
-
             try:
-                points = np.array([pc2_to_xyzrgb(pp) for pp in pc2.read_points(data, skip_nans=True, field_names=("x", "y", "z", "rgb")) if pp[0] > 0])
+                points = [pp for pp in pc2.read_points(data, skip_nans=True)]
+                pcl_data = pcl.PointCloud_PointXYZRGB()
+                pcl_data.from_list(points)
+                # import pdb; pdb.set_trace()
+                
+                color = np.array([pc2_to_xyzrgb(pp)[3:] for pp in points])
+                # points2 = np.array([pc2_to_xyzrgb(pp) for pp in pc2.read_points(data, skip_nans=True, field_names=("x", "y", "z", "rgb")) if pp[0] > 0])
+                # points = [[pp[0], pp[1], pp[2], pp[3], pc2_to_xyzrgb(pp)[3:]] for pp in pc2.read_points(data, skip_nans=True) if pp[0] > 0]
+                # import pdb; pdb.set_trace()
+                # from pcl import pcl_visualization
+                # visual = pcl.pcl_visualization.CloudViewing()
+                # visual.ShowColorCloud(pcl_data)
+
             except Exception as e:
                 print(e)
                 return
-            self.func_data[theme_name]['avg'].append(points.mean(0))
-            self.func_data[theme_name]['size'].append(len(points))
-            self.func_data[theme_name]['width'].append(data.width)
-            self.func_data[theme_name]['height'].append(data.height)
+            self.func_data[theme_name]['avg'].append(np.append(pcl_data.to_array().mean(0)[:3], color.mean(0)))
+            # self.func_data[theme_name]['size'].append(len(points))
+            # self.func_data[theme_name]['width'].append(data.width)
+            # self.func_data[theme_name]['height'].append(data.height)
+            self.func_data[theme_name]['size'].append(pcl_data.size)
+            self.func_data[theme_name]['width'].append(pcl_data.width)
+            self.func_data[theme_name]['height'].append(pcl_data.height)
+            # self.func_data[theme_name]['pcl'] = pcl_data
         return _pointscloudCallback
 
     def wait_for_message(self, params, msg_type=msg_Image):

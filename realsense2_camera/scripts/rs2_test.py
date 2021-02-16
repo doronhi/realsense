@@ -211,7 +211,10 @@ test_types = {'vis_avg': {'listener_theme': 'colorStream',
                           'data_func': lambda x: None,
                           'test_func': NotImageColorTest},
               'pointscloud_avg': {'listener_theme': 'pointscloud',
-                          'data_func': lambda x: {'width': [660353, 2300], 'height': [1], 'avg': [np.array([ 1.28251814, -0.15839984, 4.82235184, 80, 160, 240])], 'epsilon': [0.04, 5]},
+                          'data_func': lambda x: {'width': [660353, 2300], 'height': [1], 'avg': [np.array([ 0.02027357, -0.28034931, 5.02148922, 80, 160, 240])], 'epsilon': [0.04, 5]},
+                          'test_func': PointCloudTest},
+              'pointscloud_avg_ordered': {'listener_theme': 'pointscloud',
+                          'data_func': lambda x: {'width': [921600, 0], 'height': [1], 'avg': [np.array([  0.21935356, -0.20016219, 3.9, 80, 160, 240])], 'epsilon': [0.04, 5]},
                           'test_func': PointCloudTest},
               'align_depth_ir1': {'listener_theme': 'alignedDepthInfra1',
                                   'data_func': ImageDepthGetData,
@@ -314,6 +317,7 @@ def run_tests(tests):
 
         if is_node_up:
             listener_res = msg_retriever.wait_for_messages(themes)
+            print ('+++ msg_retriever done +++')
             if 'static_tf' in [test['type'] for test in rec_tests]:
                 print ('Gathering static transforms')
                 frame_ids = ['camera_link', 'camera_depth_frame', 'camera_infra1_frame', 'camera_infra2_frame', 'camera_color_frame', 'camera_fisheye_frame', 'camera_pose']
@@ -347,6 +351,7 @@ def main():
                  {'name': 'depth_avg_1', 'type': 'depth_avg', 'params': {'rosbag_filename': outdoors_filename}},
                  {'name': 'depth_w_cloud_1', 'type': 'depth_avg', 'params': {'rosbag_filename': outdoors_filename, 'enable_pointcloud': 'true'}},
                  {'name': 'points_cloud_1', 'type': 'pointscloud_avg', 'params': {'rosbag_filename': outdoors_filename, 'enable_pointcloud': 'true'}},
+                 {'name': 'points_cloud_ordered', 'type': 'pointscloud_avg_ordered', 'params': {'rosbag_filename': outdoors_filename, 'enable_pointcloud': 'true', 'ordered_pc': 'true'}},
                  {'name': 'align_depth_color_1', 'type': 'align_depth_color', 'params': {'rosbag_filename': outdoors_filename, 'align_depth': 'true'}},
                  {'name': 'align_depth_ir1_1', 'type': 'align_depth_ir1', 'params': {'rosbag_filename': outdoors_filename, 'align_depth': 'true'}},
                  {'name': 'depth_avg_decimation_1', 'type': 'depth_avg_decimation', 'params': {'rosbag_filename': outdoors_filename, 'filters': 'decimation'}},

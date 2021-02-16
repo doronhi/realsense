@@ -33,6 +33,7 @@
 
   <arg name="enable_pointcloud"   default="false"/>
   <arg name="enable_sync"         default="false"/>
+  <arg name="ordered_pc"          default="false"/>
 
   <arg name="align_depth"         default="false"/>
   <arg name="filters"             default=""/>
@@ -74,6 +75,7 @@
       <arg name="accel_fps"                value="$(arg accel_fps)"/>
       <arg name="enable_gyro"              value="$(arg enable_gyro)"/>
       <arg name="enable_accel"             value="$(arg enable_accel)"/>
+      <arg name="ordered_pc"               value="$(arg ordered_pc)"/>
       <arg name="filters"                  value="$(arg filters)"/>
     </include>
   </group>
